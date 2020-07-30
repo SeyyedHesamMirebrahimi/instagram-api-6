@@ -1,0 +1,10 @@
+{
+    "name": "socialspyzone/instagram",
+    "description": "",
+    "type": "project",
+    "license": "BSD-3-Clause",
+    "require": {
+        "php": "^5.6 || ^7.0 || ^7.1 || ^7.2 || ^7.3 || ^7.4",
+        "vlucas/phpdotenv": "^3.4"
+    }
+}
