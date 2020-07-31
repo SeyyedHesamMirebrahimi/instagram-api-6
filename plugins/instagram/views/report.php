@@ -570,7 +570,7 @@
     <div class="margin-bottom-6 d-print-none">
         <h2>Related Accounts</h2>
 
-        <?php require PROJECT_DIR . '/product/plugins/instagram/views/shared_includes/widgets/related_accounts.php' ?>
+        <?php require PROJECT_DIR . '/plugins/instagram/views/shared_includes/widgets/related_accounts.php' ?>
         <?php //require VIEWS_ROUTE . 'plugins/instagram/shared_includes/widgets/related_accounts.php' ?>
     </div>
 </div>

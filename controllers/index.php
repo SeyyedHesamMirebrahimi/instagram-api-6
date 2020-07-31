@@ -64,6 +64,8 @@ if($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     $search_results = $instagram->generalSearch($query);
+	//var_dump($search_results);
+	//exit;
 }
 
     
