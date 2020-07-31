@@ -78,9 +78,18 @@ function get_settings() {
 	global $database;
 	global $config;
 
+	mysqli_select_db($database, getenv('MYSQL_DATABASE'));
+
+	$query = $database->query("SELECT * FROM `settings` WHERE `id` = 1");
+
+	if (mysqli_error($database)) {
+		echo mysqli_error($database);
+		die;
+	}
+
     $settings = $database->query("SELECT * FROM `settings` WHERE `id` = 1")->fetch_object();
     $settings->url = $config['url'];
-
+	
     /* Parse the email templates quickly */
     $activation_email_template = json_decode($settings->activation_email_template);
     $settings->activation_email_template_subject = $activation_email_template->subject;
