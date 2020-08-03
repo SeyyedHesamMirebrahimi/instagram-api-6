@@ -16,54 +16,8 @@ if($k<4){
 	$instagram = new \InstagramScraper\Instagram();
     $instagram->setUserAgent(get_random_user_agent());
 
-    $is_proxy_request = false;
-
-    // print_r($date);die;
-    /* Check if we need to use a proxy */
-    if($settings->proxy) {
-    
-        /* Select a proxy from the database */
-        $proxy = $database->query("
-            SELECT *
-            FROM `proxies`
-            WHERE
-                (`failed_requests` < {$settings->proxy_failed_requests_pause})
-                OR
-                (`failed_requests` >= {$settings->proxy_failed_requests_pause} AND '{$date}' > DATE_ADD(`last_date`, INTERVAL {$settings->proxy_pause_duration} MINUTE))
-            ORDER BY `last_date` ASC
-        ");
-        // print_r($proxy);die;
-        if($proxy->num_rows) {
-    
-            $proxy = $proxy->fetch_object();
-    
-            $rand = rand(1, 10);
-    
-            /* Give it a 50 - 50 percent chance to choose from the server or from the proxy in case the proxy is not exclusive */
-            if($settings->proxy_exclusive || (!$settings->proxy_exclusive && $rand > 5)) {
-    
-                $is_proxy_request = [
-                    'address' => $proxy->address,
-                    'port'    => $proxy->port,
-                    'tunnel'  => true,
-                    'timeout' => $settings->proxy_timeout,
-                    'auth'    => [
-                        'user' => $proxy->username,
-                        'pass' => $proxy->password,
-                        'method' => $proxy->method
-                    ]
-                ];
-    
-            }
-    
-        }
-    
-    }
-
-    if($is_proxy_request) {
-        $instagram::setProxy($is_proxy_request);
-        $GLOBALS['proxy'] = $is_proxy_request;
-    }
+    $is_proxy_request = select_proxy($database, $settings);    
+    $instagram::setProxy($is_proxy_request);
 
     try {
         $source_account_data = $instagram->getAccount($res['user']['username']);
@@ -105,103 +59,103 @@ if($k<4){
      ?>
     
     
-                <?php
-                    if((int)$source_account_data->isPrivate()) {
-                        // $source_account_new->average_engagement_rate = 0;
-                        // $details = '';
-                    } else {
-                        $k = $k+1; 
-                        try {
-                            $media_response = $instagram->getPaginateMedias($res['user']['username'], '', $source_account_data);
-                        } catch (Exception $error) {
-                            $error_message = $_SESSION['error'][] = $error->getMessage();
-            
-                            redirect();
+    <?php
+        if((int)$source_account_data->isPrivate()) {
+            // $source_account_new->average_engagement_rate = 0;
+            // $details = '';
+        } else {
+            $k = $k+1; 
+            try {
+                $media_response = $instagram->getPaginateMedias($res['user']['username'], '', $source_account_data);
+            } catch (Exception $error) {
+                $error_message = $_SESSION['error'][] = $error->getMessage();
+
+                redirect();
+            }
+
+            /* Get extra details from last media */
+            $likes_array = [];
+            $comments_array = [];
+            $engagement_rate_array = [];
+            $hashtags_array = [];
+            $mentions_array = [];
+            $top_posts_array = [];
+            $top_posts_by_likes = [];
+            $top_posts_by_comments = [];
+            $details = [];
+            $greater_like = 0;
+            $best_post_img_link='';
+            // print_r($media_response);die;
+            /* Go over each recent media post to generate stats */
+            if ($media_response && !empty($media_response)) {
+                foreach ($media_response['medias'] as $media) {
+                    ///custom//
+                        if($media->getLikesCount() > $greater_like){
+                            $best_post_img_link = $media->getImageHighResolutionUrl();
                         }
-            
-                        /* Get extra details from last media */
-                        $likes_array = [];
-                        $comments_array = [];
-                        $engagement_rate_array = [];
-                        $hashtags_array = [];
-                        $mentions_array = [];
-                        $top_posts_array = [];
-                        $top_posts_by_likes = [];
-                        $top_posts_by_comments = [];
-                        $details = [];
-                        $greater_like = 0;
-                        $best_post_img_link='';
-                        // print_r($media_response);die;
-                        /* Go over each recent media post to generate stats */
-                        if ($media_response && !empty($media_response)) {
-                            foreach ($media_response['medias'] as $media) {
-                                ///custom//
-                                    if($media->getLikesCount() > $greater_like){
-                                        $best_post_img_link = $media->getImageHighResolutionUrl();
-                                    }
-                                ////custom ///
-                                $likes_array[$media->getShortCode()] = $media->getLikesCount();
-                                $comments_array[$media->getShortCode()] = $media->getCommentsCount();
-                                $engagement_rate_array[$media->getShortCode()] = nr(($media->getLikesCount() + $media->getCommentsCount()) / ($source_account_data->getFollowedByCount()+1) * 100, 2);
-                                $top_posts_by_likes[$media->getShortCode()] = $media->getLikesCount();
-                                $top_posts_by_comments[$media->getShortCode()] = $media->getCommentsCount();
-            
-                                $hashtags = InstagramHelper::get_hashtags($media->getCaption());
-            
-                                foreach ($hashtags as $hashtag) {
-                                    if (!isset($hashtags_array[$hashtag])) {
-                                        $hashtags_array[$hashtag] = 1;
-                                    } else {
-                                        $hashtags_array[$hashtag]++;
-                                    }
-                                }
-            
-                                $mentions = InstagramHelper::get_mentions($media->getCaption());
-            
-                                foreach ($mentions as $mention) {
-                                    if (!isset($mentions_array[$mention])) {
-                                        $mentions_array[$mention] = 1;
-                                    } else {
-                                        $mentions_array[$mention]++;
-                                    }
-                                }
-            
-                                /* End if needed */
-                                if (count($likes_array) >= $settings->instagram_calculator_media_count) break;
-                            }
+                    ////custom ///
+                    $likes_array[$media->getShortCode()] = $media->getLikesCount();
+                    $comments_array[$media->getShortCode()] = $media->getCommentsCount();
+                    $engagement_rate_array[$media->getShortCode()] = nr(($media->getLikesCount() + $media->getCommentsCount()) / ($source_account_data->getFollowedByCount()+1) * 100, 2);
+                    $top_posts_by_likes[$media->getShortCode()] = $media->getLikesCount();
+                    $top_posts_by_comments[$media->getShortCode()] = $media->getCommentsCount();
+
+                    $hashtags = InstagramHelper::get_hashtags($media->getCaption());
+
+                    foreach ($hashtags as $hashtag) {
+                        if (!isset($hashtags_array[$hashtag])) {
+                            $hashtags_array[$hashtag] = 1;
+                        } else {
+                            $hashtags_array[$hashtag]++;
                         }
+                    }
+
+                    $mentions = InstagramHelper::get_mentions($media->getCaption());
+
+                    foreach ($mentions as $mention) {
+                        if (!isset($mentions_array[$mention])) {
+                            $mentions_array[$mention] = 1;
+                        } else {
+                            $mentions_array[$mention]++;
+                        }
+                    }
+
+                    /* End if needed */
+                    if (count($likes_array) >= $settings->instagram_calculator_media_count) break;
+                }
+            }
+
+            /* Calculate needed details */
+            $details['total_likes'] = array_sum($likes_array);
+            $details['total_comments'] = array_sum($comments_array);
+            $details['average_comments'] = count($likes_array) > 0 ? $details['total_comments'] / count($comments_array) : 0;
+            $details['average_likes'] = count($likes_array) > 0 ? $details['total_likes'] / count($likes_array) : 0;
+            // $source_account_new->average_engagement_rate = count($likes_array) > 0 ? number_format(array_sum($engagement_rate_array) / count($engagement_rate_array), 2) : 0;
+            $details['ER'] = count($likes_array) > 0 ? number_format(array_sum($engagement_rate_array) / count($engagement_rate_array), 2) : 0;
+            /* Do proper sorting */
+            // print_r($top_posts_by_likes);echo '<br><br><br>';
+            arsort($top_posts_by_likes);
+            arsort($top_posts_by_comments);
+            arsort($engagement_rate_array);
+            arsort($hashtags_array);
+            arsort($mentions_array);
+            // print_r($top_posts_by_likes);echo '<br><br><br>';
+            $top_posts_array = array_slice($engagement_rate_array, 0, 3);
+            $top_hashtags_array = array_slice($hashtags_array, 0, 15);
+            $top_mentions_array = array_slice($mentions_array, 0, 15);
+            $top_posts_by_likes = array_slice($top_posts_by_likes, 0, 3);
+            $top_posts_by_comments = array_slice($top_posts_by_comments, 0, 3);
+            // print_r($top_posts_by_likes);echo '<br><br><br>';
+            /* Get them all together */
+            $details['top_hashtags'] = $top_hashtags_array;
+            $details['top_mentions'] = $top_mentions_array;
+            $details['top_posts'] = $top_posts_array;
+            $details['top_posts_by_comments'] = $top_posts_by_comments;
+            $details['top_posts_by_likes'] = $top_posts_by_likes;
+            $details['background_image'] = $best_post_img_link;
+            // $details = json_encode($details); ?>
             
-                        /* Calculate needed details */
-                        $details['total_likes'] = array_sum($likes_array);
-                        $details['total_comments'] = array_sum($comments_array);
-                        $details['average_comments'] = count($likes_array) > 0 ? $details['total_comments'] / count($comments_array) : 0;
-                        $details['average_likes'] = count($likes_array) > 0 ? $details['total_likes'] / count($likes_array) : 0;
-                        // $source_account_new->average_engagement_rate = count($likes_array) > 0 ? number_format(array_sum($engagement_rate_array) / count($engagement_rate_array), 2) : 0;
-                        $details['ER'] = count($likes_array) > 0 ? number_format(array_sum($engagement_rate_array) / count($engagement_rate_array), 2) : 0;
-                        /* Do proper sorting */
-                        // print_r($top_posts_by_likes);echo '<br><br><br>';
-                        arsort($top_posts_by_likes);
-                        arsort($top_posts_by_comments);
-                        arsort($engagement_rate_array);
-                        arsort($hashtags_array);
-                        arsort($mentions_array);
-                        // print_r($top_posts_by_likes);echo '<br><br><br>';
-                        $top_posts_array = array_slice($engagement_rate_array, 0, 3);
-                        $top_hashtags_array = array_slice($hashtags_array, 0, 15);
-                        $top_mentions_array = array_slice($mentions_array, 0, 15);
-                        $top_posts_by_likes = array_slice($top_posts_by_likes, 0, 3);
-                        $top_posts_by_comments = array_slice($top_posts_by_comments, 0, 3);
-                        // print_r($top_posts_by_likes);echo '<br><br><br>';
-                        /* Get them all together */
-                        $details['top_hashtags'] = $top_hashtags_array;
-                        $details['top_mentions'] = $top_mentions_array;
-                        $details['top_posts'] = $top_posts_array;
-                        $details['top_posts_by_comments'] = $top_posts_by_comments;
-                        $details['top_posts_by_likes'] = $top_posts_by_likes;
-                        $details['background_image'] = $best_post_img_link;
-                        // $details = json_encode($details); ?>
-            
-                        <div class="single-card single-card-wraper col-lg-4 col-md-6 col-sm-12 card card-shadow mt-5 mb-1 zoomer">
+        <div class="single-card single-card-wraper col-lg-4 col-md-6 col-sm-12 card card-shadow mt-5 mb-1 zoomer">
         
         <div class="card-body1 card-details card-border">
             <div class=" card-content d-flex flex-column flex-sm-column flex-wrap">

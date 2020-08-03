@@ -357,8 +357,8 @@ class Instagram
         // print_r($this->generateHeaders($this->userSession));
         
         $response = Request::get(Endpoints::getGeneralSearchJsonLink($username), $this->generateHeaders($this->userSession));
-        // die;
-            // print_r($response);
+        //print_r($response);
+        //die;
         if (static::HTTP_NOT_FOUND === $response->code) {
             throw new InstagramNotFoundException('Account with given username does not exist.');
         }
@@ -380,6 +380,8 @@ class Instagram
     public function getAccount($username)
     {
         $response = Request::get(Endpoints::getAccountPageLink($username), $this->generateHeaders($this->userSession));
+        //var_dump($response);
+        //exit();
 
         if (static::HTTP_NOT_FOUND === $response->code) {
             throw new InstagramNotFoundException('Account with given username does not exist.');

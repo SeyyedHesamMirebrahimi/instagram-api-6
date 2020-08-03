@@ -2,6 +2,52 @@
 defined('ALTUMCODE') || die();
 use PHPMailer\PHPMailer\PHPMailer;
 
+function select_proxy($database, $settings) 
+{
+    $query = $database->query("SELECT `proxy_id` FROM `proxies`");
+    $proxy_ids = $query->fetch_all(MYSQLI_ASSOC);
+    
+    if (!isset($_SESSION['proxy_index'])) {
+        $_SESSION['proxy_index'] = mt_rand(0, count($proxy_ids) - 1);
+    } else {
+        $_SESSION['proxy_index']++;
+    }
+    
+    if (!isset($proxy_ids[$_SESSION['proxy_index']])) {
+        $_SESSION['proxy_index'] = 0;
+    }
+    
+    if (!isset($proxy_ids[$_SESSION['proxy_index']]['proxy_id']))
+    {
+        throw new \Exception('Proxies are not configured');
+    }
+    
+    $proxyId = $proxy_ids[$_SESSION['proxy_index']]['proxy_id'];
+    
+    /* Select a proxy from the database */
+    $proxy = $database->query("
+        SELECT *
+        FROM `proxies`
+        WHERE `proxy_id` = '" . $proxyId . "'
+    ");
+    
+    $proxy = $proxy->fetch_object();
+    
+    $is_proxy_request = [
+        'address' => $proxy->address,
+        'port'    => $proxy->port,
+        'tunnel'  => true,
+        'timeout' => $settings->proxy_timeout,
+        'auth'    => [
+            'user' => $proxy->username,
+            'pass' => $proxy->password,
+            'method' => $proxy->method
+        ]
+    ];
+    
+    return $is_proxy_request;
+}
+
 function httpRequest($url, $method = 'GET', array $params = [])
 {
     if (function_exists('curl_init') === false) {
